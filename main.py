@@ -1,6 +1,7 @@
 import config
 from claude import ask_claude
 from db import search_context
+from experiments import save_experiment
 from gemini import ask_gemini
 
 
@@ -21,6 +22,19 @@ def ask_float(prompt: str, default: float) -> float:
     return default
 
   return float(value)
+
+
+def ask_yes_no(prompt: str) -> int:
+  while True:
+    value = input(f"{prompt} [да/нет]: ").strip().lower()
+
+    if value in {"да", "д", "yes", "y", "1"}:
+      return 1
+
+    if value in {"нет", "н", "no", "n", "0"}:
+      return 0
+
+    print("Введите да или нет.")
 
 
 def choose_model() -> str:
@@ -69,8 +83,32 @@ def main() -> None:
       print("Диалог завершен.")
       break
 
-    answer = answer_question(model, question, top_k, temperature)
+    try:
+      answer = answer_question(model, question, top_k, temperature)
+    except Exception as error:
+      print(f"\nНе получилось получить ответ от {model}: {error}")
+      print("Ответ не записан в базу. Попробуйте еще раз или выберите другую модель.\n")
+      continue
+
     print(f"\nОтвет {model}:\n{answer}\n")
+
+    print("Анкета для таблицы:")
+    prompt_accuracy = input(
+      "Точность промпта (например: общий / средний / строгий): "
+    ).strip()
+    matches_document = ask_yes_no("Ответ соответствует документу?")
+
+    save_experiment(
+      model_name=model,
+      question=question,
+      answer=answer,
+      temperature=temperature,
+      context_depth=top_k,
+      prompt_accuracy=prompt_accuracy,
+      matches_document=matches_document
+    )
+
+    print("Записала результат в базу.\n")
 
 
 if __name__ == "__main__":
